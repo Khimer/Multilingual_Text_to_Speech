@@ -71,7 +71,7 @@ if __name__ == '__main__':
                 if not os.path.exists(mel_path):
                     np.save(mel_path, audio.spectrogram(audio_data, True))
                 lin_path = os.path.join(d, lin_path_partial)
-                if not os.path.exists(lin_path):
-                    np.save(lin_path, audio.spectrogram(audio_data, False))
+                # if not os.path.exists(lin_path):
+                #     np.save(lin_path, audio.spectrogram(audio_data, False))
 
                 print(f'{idx}|{s}|{l}|{a}|{mel_path_partial}|{lin_path_partial}|{raw_text}|{ph}', file=f)
