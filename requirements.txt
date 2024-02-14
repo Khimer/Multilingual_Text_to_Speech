@@ -4,9 +4,9 @@ epitran==1.2
 fastdtw==0.3.4
 future
 jieba==0.42.1
-librosa==0.7.0
+librosa
 matplotlib
-numpy
+numpy==1.23.5
 pandas
 phonemizer==2.1
 Pillow==10.0.1
@@ -17,4 +17,4 @@ seaborn
 SoundFile==0.10.2
 tensorboard==2.0.2
 torch==1.13.1
-numba==0.48
+#numba==0.48
