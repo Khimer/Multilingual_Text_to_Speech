@@ -4,6 +4,7 @@ import datetime
 import math
 import numpy as np
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from dataset.dataset import TextToSpeechDatasetCollection, TextToSpeechCollate
@@ -46,7 +47,7 @@ def train(logging_start_epoch, epoch, data, model, criterion, optimizer):
     done, start_time = 0, time.time()
 
     # loop through epoch batches
-    for i, batch in enumerate(data):     
+    for i, batch in tqdm(enumerate(data)):     
 
         global_step = done + epoch * len(data)
         optimizer.zero_grad() 
@@ -93,6 +94,7 @@ def train(logging_start_epoch, epoch, data, model, criterion, optimizer):
 
         start_time = time.time()
         done += 1 
+    tqdm.write(f'loss: {loss}')
     
 
 def evaluate(epoch, data, model, criterion):  
@@ -291,11 +293,13 @@ if __name__ == '__main__':
 
     # training loop
     best_eval = float('inf')
-    for epoch in range(initial_epoch, hp.epochs):
+    for epoch in tqdm(range(initial_epoch, hp.epochs)):
+        tqdm.write(f'epoch = {epoch}')
         train(args.logging_start, epoch, train_data, model, criterion, optimizer)  
         if hp.learning_rate_decay_start - hp.learning_rate_decay_each < epoch * len(train_data):
             scheduler.step()
         eval_loss = evaluate(epoch, eval_data, model, criterion)   
+        tqdm.write(f'eval_loss = {eval_loss}')
         if (epoch + 1) % hp.checkpoint_each_epochs == 0:
             # save checkpoint together with hyper-parameters, optimizer and scheduler states
             checkpoint_file = f'{checkpoint_dir}/{hp.version}_loss-{epoch}-{eval_loss:2.3f}'
