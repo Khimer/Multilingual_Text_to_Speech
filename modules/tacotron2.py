@@ -11,6 +11,7 @@ from modules.cbhg import PostnetCBHG
 from modules.classifier import ReversalClassifier, CosineSimilarityClassifier
 from params.params import Params as hp
 
+#check
 
 class Prenet(torch.nn.Module):
     """Decoder pre-net module.
