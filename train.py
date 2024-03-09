@@ -47,7 +47,7 @@ def train(logging_start_epoch, epoch, data, model, criterion, optimizer):
     done, start_time = 0, time.time()
 
     # loop through epoch batches
-    for i, batch in tqdm(enumerate(data)):     
+    for i, batch in tqdm(enumerate(data), total=len(data)):
 
         global_step = done + epoch * len(data)
         optimizer.zero_grad() 
