@@ -458,7 +458,7 @@ class Tacotron(torch.nn.Module):
         # encode input
         embedded = self._embedding(text)
         encoded = self._encoder(embedded, text_length, languages)
-        encoder_output = encoded.clone()
+        encoder_output = encoded
 
 
 
@@ -472,20 +472,21 @@ class Tacotron(torch.nn.Module):
         except IndexError:
             print(encoded.size(0), text_length, reference_encoded.size(1))
             print(text.shape, encoded.shape, reference_encoded.shape)
+            raise
 
         # add prosody info to character encoder's output
-        encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask)
+        trans_encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask)
 
         # return paddings
         for i in range(hp.batch_size):
-            encoded[i, text_length[i]:] = encoder_output[i, text_length[i]:]
+            trans_encoded[i, text_length[i]:] = encoder_output[i, text_length[i]:]
 
 
         
         # decode 
         if languages is not None and languages.dim() == 3:
             languages = torch.argmax(languages, dim=2) # convert one-hot into indices
-        decoded = self._decoder(encoded, text_length, target, teacher_forcing_ratio, speakers, languages)
+        decoded = self._decoder(trans_encoded, text_length, target, teacher_forcing_ratio, speakers, languages)
         prediction, stop_token, alignment = decoded
         pre_prediction = prediction.transpose(1,2)
         post_prediction = self._postnet(pre_prediction, target_length)
