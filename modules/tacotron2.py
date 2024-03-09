@@ -11,7 +11,97 @@ from modules.cbhg import PostnetCBHG
 from modules.classifier import ReversalClassifier, CosineSimilarityClassifier
 from params.params import Params as hp
 
-#check
+import torch
+import torch.nn as nn
+
+def create_attention_matrix(size, max_text_length):
+    matrix = torch.full((size, size), float('-inf'))
+    matrix.fill_diagonal_(0)
+    matrix[:,max_text_length:] = 0
+    return matrix
+
+def create_padding_mask(batch_size, seq_lengths, max_prosody_len):
+    max_seq_len = max(seq_lengths)
+
+    padding_mask = torch.zeros(batch_size, max_seq_len+max_prosody_len, dtype=torch.bool)
+
+    for i in range(batch_size):
+        padding_mask[i, seq_lengths[i]:max_seq_len] = True
+
+    return padding_mask
+
+class TransformerEncoderWithPaddingMask(nn.Module):
+    def __init__(self, input_size, num_layers, num_heads, hidden_size, dropout=0.1):
+        self.hidden_size = hidden_size
+        super(TransformerEncoderWithPaddingMask, self).__init__()
+        encoder_layers = nn.TransformerEncoderLayer(input_size, num_heads, hidden_size, dropout, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
+        self.positional_encoder = PositionalEncoding(input_size)
+
+    def forward(self, src, prosody_src, src_key_padding_mask):
+        src_max_length = src.size(1)
+        src = torch.cat((src, prosody_src), dim=1)
+        att_mask = create_attention_matrix(src.size(1), src_max_length)
+        src = src * math.sqrt(self.hidden_size)
+        src = self.positional_encoder(src)
+        output = self.transformer_encoder(src, att_mask,  src_key_padding_mask=src_key_padding_mask)
+        output = output[:,:src_max_length, :]
+        return output
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return x
+
+class ReferenceEncoder(torch.nn.Module):
+
+    def __init__(self):
+        super(ReferenceEncoder, self).__init__()
+
+        convs = [nn.Conv2d(in_channels=1, out_channels=64, kernel_size=(5, 1), stride=(2, 1)),
+                 nn.ReLU(),
+                 nn.Dropout2d(p=0.25),
+                 nn.Conv2d(in_channels=64, out_channels=32, kernel_size=(5, 1)),
+                 nn.ReLU(),
+                 nn.Dropout2d(p=0.25),
+                 nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(5, 1), stride=(2, 1)),
+                 nn.ReLU(),
+                 nn.Dropout2d(p=0.25),
+                 nn.Conv2d(in_channels=16, out_channels=1, kernel_size=(5, 1)),
+                 nn.ReLU()]
+
+        # reducing the sequence length by 4 times
+        self._convs = Sequential(*convs)
+        # compress MEL representation from 80 to 16 to 256
+        downs_and_ups = [Linear(80, 128),
+                         nn.ReLU(),
+                         nn.Dropout(p=0.25),
+                         Linear(128, 16),
+                         nn.ReLU(),
+                         nn.Dropout(p=0.25),
+                         Linear(16, 256),
+                         nn.ReLU()]
+        # upscale representation from 80 to decoder_input_dimension (like decoder input output)
+        self.bottlneck_re = Sequential(*downs_and_ups)
+
+    def forward(self, x):
+        x = x.transpose(1, 2).unsqueeze(1)
+        x = self._convs(x)
+        x = torch.squeeze(x, dim=1)
+        x = self.bottlneck_re(x)
+
+        return x
 
 class Prenet(torch.nn.Module):
     """Decoder pre-net module.
@@ -242,6 +332,10 @@ class Tacotron(torch.nn.Module):
         # Encoder transforming graphmenes or phonemes into abstract input representation
         self._encoder = self._get_encoder(hp.encoder_type)
 
+        self._reference_encoder = ReferenceEncoder()
+        self.transformer_encoder = TransformerEncoderWithPaddingMask(256, 4, 8,
+                                                                     512)
+
         # Reversal language classifier to make encoder truly languagge independent
         if hp.reversal_classifier:
             self._reversal_classifier = self._get_adversarial_classifier(hp.reversal_classifier_type)
@@ -363,10 +457,26 @@ class Tacotron(torch.nn.Module):
         # encode input
         embedded = self._embedding(text)
         encoded = self._encoder(embedded, text_length, languages)
-        encoder_output = encoded
+        encoder_output = encoded.clone()
+
+
 
         # predict language as an adversarial task if needed
         speaker_prediction = self._reversal_classifier(encoded) if hp.reversal_classifier else None
+
+        # extract prosody info from MEL
+        reference_encoded = self._reference_encoder(target)
+
+        padding_mask = create_padding_mask(hp.batch_size, text_length, reference_encoded.size(1))
+
+        # add prosody info to character encoder's output
+        encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask)
+
+        # return paddings
+        for i in range(hp.batch_size):
+            encoded[i, text_length[i]:] = encoder_output[i, text_length[i]:]
+
+
         
         # decode 
         if languages is not None and languages.dim() == 3:
