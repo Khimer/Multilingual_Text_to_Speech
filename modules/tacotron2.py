@@ -478,7 +478,7 @@ class Tacotron(torch.nn.Module):
         trans_encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask)
 
         # return paddings
-        for i in range(hp.batch_size):
+        for i in range(encoded.size(0)):
             trans_encoded[i, text_length[i]:] = encoder_output[i, text_length[i]:]
 
 
