@@ -18,6 +18,7 @@ def create_attention_matrix(size, max_text_length):
     matrix = torch.full((size, size), float('-inf'))
     matrix.fill_diagonal_(0)
     matrix[:,max_text_length:] = 0
+    matrix = matrix.to('cuda')
     return matrix
 
 def create_padding_mask(batch_size, seq_lengths, max_prosody_len):
@@ -27,7 +28,7 @@ def create_padding_mask(batch_size, seq_lengths, max_prosody_len):
 
     for i in range(batch_size):
         padding_mask[i, seq_lengths[i]:max_seq_len] = True
-
+    padding_mask = padding_mask.to('cuda')
     return padding_mask
 
 class TransformerEncoderWithPaddingMask(nn.Module):
@@ -466,8 +467,11 @@ class Tacotron(torch.nn.Module):
 
         # extract prosody info from MEL
         reference_encoded = self._reference_encoder(target)
-
-        padding_mask = create_padding_mask(hp.batch_size, text_length, reference_encoded.size(1))
+        try:
+            padding_mask = create_padding_mask(encoded.size(0), text_length, reference_encoded.size(1))
+        except IndexError:
+            print(encoded.size(0), text_length, reference_encoded.size(1))
+            print(text.shape, encoded.shape, reference_encoded.shape)
 
         # add prosody info to character encoder's output
         encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask)
