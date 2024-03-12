@@ -220,6 +220,9 @@ if __name__ == '__main__':
     if args.hyper_parameters is not None:
         hp_path = os.path.join(args.base_directory, 'params', f'{args.hyper_parameters}.json')
         hp.load(hp_path)
+    print(hp.learning_rate)
+    print(hp.learning_rate_decay)
+    raise
 
     # load dataset
     dataset = TextToSpeechDatasetCollection(os.path.join(args.data_root, hp.dataset))
