@@ -81,6 +81,8 @@ def synthesize(model, input_data, mel_spec, force_cpu=False):
     mean = np.mean(spectrogram, axis=1, keepdims=True)
     std = np.std(spectrogram, axis=1, keepdims=True)
     spectrogram = (spectrogram - mean) / std
+    spectrogram = torch.tensor(np.array([spectrogram]))
+    spectrogram = spectrogram.to('cuda')
     s = model.inference(t, speaker=s, target=spectrogram, language=l).cpu().detach().numpy()
     s = audio.denormalize_spectrogram(s, not hp.predict_linear)
 
