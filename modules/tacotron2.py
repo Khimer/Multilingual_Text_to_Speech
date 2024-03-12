@@ -39,13 +39,16 @@ class TransformerEncoderWithPaddingMask(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
         self.positional_encoder = PositionalEncoding(input_size)
 
-    def forward(self, src, prosody_src, src_key_padding_mask):
+    def forward(self, src, prosody_src, src_key_padding_mask, train=True):
         src_max_length = src.size(1)
         src = torch.cat((src, prosody_src), dim=1)
         att_mask = create_attention_matrix(src.size(1), src_max_length)
         src = src * math.sqrt(self.hidden_size)
         src = self.positional_encoder(src)
-        output = self.transformer_encoder(src, att_mask,  src_key_padding_mask=src_key_padding_mask)
+        if train:
+            output = self.transformer_encoder(src, att_mask,  src_key_padding_mask=src_key_padding_mask)
+        else:
+            output = self.transformer_encoder(src, att_mask)
         output = output[:,:src_max_length, :]
         return output
 
@@ -500,7 +503,7 @@ class Tacotron(torch.nn.Module):
 
         return post_prediction, pre_prediction, stop_token, alignment, speaker_prediction, encoder_output
 
-    def inference(self, text, speaker=None, language=None):
+    def inference(self, text, target, speaker=None, language=None):
         # pretend having a batch of size 1
         text.unsqueeze_(0)
 
@@ -512,11 +515,13 @@ class Tacotron(torch.nn.Module):
         # encode input
         embedded = self._embedding(text)
         encoded = self._encoder(embedded, torch.LongTensor([text.size(1)]), language)
-        
+        reference_encoded = self._reference_encoder(target)
+        trans_encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask=None, train=False)
+
         # decode with respect to speaker and language embeddings
         if language is not None and language.dim() == 3:
             language = torch.argmax(language, dim=2) # convert one-hot into indices
-        prediction = self._decoder.inference(encoded, speaker, language)
+        prediction = self._decoder.inference(trans_encoded, speaker, language)
 
         # post process generated spectrogram
         prediction = prediction.transpose(1,2)
