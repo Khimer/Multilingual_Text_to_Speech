@@ -215,7 +215,7 @@ if __name__ == '__main__':
         checkpoint = os.path.join(checkpoint_dir, args.checkpoint)
         checkpoint_state = torch.load(checkpoint, map_location='cpu')
         hp.load_state_dict(checkpoint_state['parameters'])      
-
+    print(checkpoint_state)
     # load hyperparameters
     if args.hyper_parameters is not None:
         hp_path = os.path.join(args.base_directory, 'params', f'{args.hyper_parameters}.json')
