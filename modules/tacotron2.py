@@ -516,7 +516,7 @@ class Tacotron(torch.nn.Module):
         embedded = self._embedding(text)
         encoded = self._encoder(embedded, torch.LongTensor([text.size(1)]), language)
         reference_encoded = self._reference_encoder(target)
-        trans_encoded = self.transformer_encoder(encoded, reference_encoded, padding_mask=None, train=False)
+        trans_encoded = self.transformer_encoder(encoded, reference_encoded, src_key_padding_mask=None, train=False)
 
         # decode with respect to speaker and language embeddings
         if language is not None and language.dim() == 3:
