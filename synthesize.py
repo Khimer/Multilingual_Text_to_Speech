@@ -78,7 +78,8 @@ def synthesize(model, input_data, audio_path, force_cpu=False):
         if l is not None: l = l.cuda(non_blocking=True)
         if s is not None: s = s.cuda(non_blocking=True)
 
-    spectrogram = audio.spectrogram(audio_path, True)
+    audio_data = audio.load(audio_path)
+    spectrogram = audio.spectrogram(audio_data, True)
     mean = np.mean(spectrogram, axis=1, keepdims=True)
     std = np.std(spectrogram, axis=1, keepdims=True)
     spectrogram = (spectrogram - mean) / std
