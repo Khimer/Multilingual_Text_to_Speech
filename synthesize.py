@@ -38,7 +38,7 @@ from modules.tacotron2 import Tacotron
 """
 
 
-def synthesize(model, input_data, mel_spec, force_cpu=False):
+def synthesize(model, input_data, audio_path, force_cpu=False):
 
     item = input_data.split('|')
     clean_text = item[1]
@@ -77,7 +77,8 @@ def synthesize(model, input_data, mel_spec, force_cpu=False):
         t = t.cuda(non_blocking=True)
         if l is not None: l = l.cuda(non_blocking=True)
         if s is not None: s = s.cuda(non_blocking=True)
-    spectrogram = np.load(mel_spec)
+
+    spectrogram = audio.spectrogram(audio_path, True)
     mean = np.mean(spectrogram, axis=1, keepdims=True)
     std = np.std(spectrogram, axis=1, keepdims=True)
     spectrogram = (spectrogram - mean) / std
