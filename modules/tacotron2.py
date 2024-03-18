@@ -42,13 +42,18 @@ class TransformerEncoderWithPaddingMask(nn.Module):
     def forward(self, src, prosody_src, src_key_padding_mask, train=True):
         src_max_length = src.size(1)
         src = torch.cat((src, prosody_src), dim=1)
-        att_mask = create_attention_matrix(src.size(1), src_max_length)
+        #att_mask = create_attention_matrix(src.size(1), src_max_length)
         src = src * math.sqrt(self.hidden_size)
         src = self.positional_encoder(src)
+        # if train:
+        #     output = self.transformer_encoder(src, att_mask,  src_key_padding_mask=src_key_padding_mask)
+        # else:
+        #     output = self.transformer_encoder(src, att_mask)
+
         if train:
-            output = self.transformer_encoder(src, att_mask,  src_key_padding_mask=src_key_padding_mask)
+            output = self.transformer_encoder(src, src_key_padding_mask=src_key_padding_mask)
         else:
-            output = self.transformer_encoder(src, att_mask)
+            output = self.transformer_encoder(src)
         output = output[:,:src_max_length, :]
         return output
 
